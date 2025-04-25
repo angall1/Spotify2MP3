@@ -239,9 +239,9 @@ class Spotify2MP3GUI:
         total = len(rows)
         self.progress['maximum'] = total
         for i,row in enumerate(rows,1):
-            title = row.get('Track Name') or 'Unknown'
-            artist= row.get('Artist Name(s)') or 'Unknown'
-            album = row.get('Album Name') or playlist_name
+            title = row.get('Track Name') or row.get('Track name') or'Unknown'
+            artist= row.get('Artist Name(s)') or row.get('Artist name') or'Unknown'
+            album = row.get('Album Name') or row.get('Album') or playlist_name
             safe_title = re.sub(r"[^\w\s]",'',title)
             safe_artist= re.sub(r"[^\w\s]",'',artist)
             new_files=[]
