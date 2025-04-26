@@ -227,7 +227,10 @@ class Spotify2MP3GUI:
     def open_output_folder(self):
         target = self.last_output_dir or self.output_folder
         if target and os.path.isdir(target):
-            os.startfile(target)
+            if platform.system() == "Windows":
+                os.startfile(target)
+            else:
+                subprocess.run(['open', target])
         else:
             messagebox.showerror('Error', 'No valid folder to open.')
 
@@ -289,7 +292,8 @@ class Spotify2MP3GUI:
             temp_output
         ]
         try:
-            subprocess.run(cmd, check=True, capture_output=True)
+            creationflags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
+            subprocess.run(cmd, check=True, capture_output=True, creationflags=creationflags)
             os.replace(temp_output, audio_file)
             # Restore original timestamps
             self.set_file_timestamps(audio_file, timestamps)
@@ -499,8 +503,7 @@ class Spotify2MP3GUI:
             for variant in cfg['variants']:
                 q = f"{safe_title} {safe_artist} {variant}".strip()
                 self.status_label.config(text=f"[{i}/{total}] Searching: {q}")
-                yt_dlp = yt_dlp_exe
-                cmd = [yt_dlp, f'--ffmpeg-location={ffmpeg_path}', '-f', 'bestaudio[ext=m4a]/bestaudio']
+                cmd = [yt_dlp_exe, f'--ffmpeg-location={ffmpeg_path}', '-f', 'bestaudio[ext=m4a]/bestaudio']
                 # Thumbnail embedding
                 if self.thumb_var.get():
                     cmd += ['--embed-thumbnail', '--add-metadata']
@@ -511,7 +514,7 @@ class Spotify2MP3GUI:
                 else:
                     cmd += ['--remux-video', 'm4a']
                 cmd += ['--output', os.path.join(output_dir, '%(title)s.%(ext)s'), '--no-playlist', f'ytsearch1:{q}']
-                creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+                creationflags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
 
                 result = subprocess.run(cmd, capture_output=True, text=True, creationflags=creationflags)
                 if result.returncode != 0:
@@ -556,7 +559,10 @@ class Spotify2MP3GUI:
             with open(m3u_path, 'w', encoding='utf-8') as m3u:
                 for fn in downloaded:
                     raw = os.path.join(output_dir, fn)
-                    m3u.write(str(PureWindowsPath(raw)) + '\r\n')
+                    if platform.system() == "Windows":
+                        m3u.write(str(PureWindowsPath(raw)) + '\r\n')
+                    else:
+                        m3u.write(raw + '\n')
 
         # Handle album art if Spotify album art was enabled
         if self.spotify_art_var.get():
