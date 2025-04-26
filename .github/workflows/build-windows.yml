@@ -1,0 +1,70 @@
+name: Build Spotify2MP3 Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to create'
+        default: '1.2.6'
+        required: true
+        type: string
+
+env:
+  LEVEL: ${{ inputs.version }}
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Download and setup ffmpeg
+      run: |
+        mkdir ffmpeg
+        cd ffmpeg
+        Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile "ffmpeg.zip"
+        Expand-Archive -Path "ffmpeg.zip" -DestinationPath "."
+        Move-Item -Path "ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe" -Destination "."
+        Remove-Item -Recurse -Force "ffmpeg-master-latest-win64-gpl"
+        Remove-Item "ffmpeg.zip"
+
+    - name: Download and setup yt-dlp
+      run: |
+        mkdir yt-dlp
+        cd yt-dlp
+        Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile "yt-dlp.exe"
+
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --windowed --name "Spotify2MP3" `
+          --add-data "ffmpeg/ffmpeg.exe;ffmpeg" `
+          --add-data "yt-dlp/yt-dlp.exe;yt-dlp" `
+          --add-data "config.json;." `
+          --add-data "icon.ico;." `
+          --icon=icon.ico `
+          spotify2media.py
+
+    - name: Zip the app
+      run: |
+        Compress-Archive -Path "dist\Spotify2MP3" -DestinationPath "dist\Spotify2MP3.zip" -Force
+        
+    - name: Create GitHub Draft
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ env.LEVEL }}
+        name: Spotify2MP3 v${{ env.LEVEL }}
+        draft: true
+        prerelease: false
+        files: dist/Spotify2MP3.zip
