@@ -55,6 +55,7 @@ jobs:
           --add-data "icon.ico;." `
           --icon=icon.ico `
           spotify2media.py
+        Rename-Item -Path "dist/Spotify2MP3.exe" -NewName "Spotify2MP3_Windows.exe"
 
     - name: Create GitHub Draft
       uses: softprops/action-gh-release@v1
