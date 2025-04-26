@@ -399,9 +399,9 @@ class Spotify2MP3GUI:
                 chrome_options.add_argument('--disable-dev-shm-usage')
                 
                 chrome_paths = [
+                        os.path.join(os.environ.get('PROGRAMFILES', 'C:/Program Files'), 'Google/Chrome/Application/chrome.exe'),
+                        os.path.join(os.environ.get('PROGRAMFILES(X86)', 'C:/Program Files (x86)'), 'Google/Chrome/Application/chrome.exe'),
                         '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',  # macOS
-                        r'C:\Program Files\Google\Chrome\Application\chrome.exe',   # Windows
-                        r'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe'  # Windows (x86)
                 ]
                     
                 chrome_found = False
