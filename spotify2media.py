@@ -400,8 +400,8 @@ class Spotify2MP3GUI:
                 
                 chrome_paths = [
                         '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',  # macOS
-                        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',   # Windows
-                        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'  # Windows (x86)
+                        'C:\Program Files\Google\Chrome\Application\chrome.exe',   # Windows
+                        'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe'  # Windows (x86)
                 ]
                     
                 chrome_found = False

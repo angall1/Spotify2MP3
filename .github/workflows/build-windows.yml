@@ -48,7 +48,7 @@ jobs:
 
     - name: Build with PyInstaller
       run: |
-        pyinstaller --windowed --name "Spotify2MP3" `
+        pyinstaller --onefile --windowed --name "Spotify2MP3" `
           --add-data "ffmpeg/ffmpeg.exe;ffmpeg" `
           --add-data "yt-dlp/yt-dlp.exe;yt-dlp" `
           --add-data "config.json;." `
@@ -58,7 +58,7 @@ jobs:
 
     - name: Zip the app
       run: |
-        Compress-Archive -Path "dist\Spotify2MP3" -DestinationPath "dist\Spotify2MP3.zip" -Force
+        Compress-Archive -Path "dist\Spotify2MP3.exe" -DestinationPath "dist\Spotify2MP3_Windows.zip" -Force
         
     - name: Create GitHub Draft
       uses: softprops/action-gh-release@v1
@@ -67,4 +67,4 @@ jobs:
         name: Spotify2MP3 v${{ env.LEVEL }}
         draft: true
         prerelease: false
-        files: dist/Spotify2MP3.zip
+        files: dist/Spotify2MP3_Windows.zip
