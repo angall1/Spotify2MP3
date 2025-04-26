@@ -149,13 +149,13 @@ class Spotify2MP3GUI:
         self.m3u_check.pack(pady=2)
         Tooltip(self.m3u_check, 'Create a .m3u playlist file.')
         self.thumb_var = tk.BooleanVar(value=False)
-        self.thumb_check = tk.Checkbutton(self.root, text='Embed thumbnails as cover art', variable=self.thumb_var)
+        self.thumb_check = tk.Checkbutton(self.root, text='Embed thumbnails as cover art', variable=self.thumb_var, command=self.update_artwork_options)
         self.thumb_check.pack(pady=2)
         Tooltip(self.thumb_check, 'Fetch and embed video thumbnails into the audio file.')
 
         # Spotify album art option
         self.spotify_art_var = tk.BooleanVar(value=False)
-        self.spotify_art_check = tk.Checkbutton(self.root, text='Get album art from Spotify (Requires Chrome)', variable=self.spotify_art_var)
+        self.spotify_art_check = tk.Checkbutton(self.root, text='Get album art from Spotify (Requires Chrome)', variable=self.spotify_art_var, command=self.update_artwork_options)
         self.spotify_art_check.pack(pady=2)
         Tooltip(self.spotify_art_check, 'Download album art from Spotify using spotifycover.art')
         
@@ -270,8 +270,16 @@ class Spotify2MP3GUI:
         audio_filename = os.path.basename(audio_file)
         temp_output = os.path.join(audio_dir, f"temp_{audio_filename}")
         
+        # Get the correct ffmpeg path
+        if platform.system() == "Darwin":  # macOS
+            ffmpeg_path = resource_path("ffmpeg")
+            ffmpeg_exe = os.path.join(ffmpeg_path, "ffmpeg")
+        else:
+            ffmpeg_path = resource_path("ffmpeg")
+            ffmpeg_exe = os.path.join(ffmpeg_path, "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg")
+        
         cmd = [
-            'ffmpeg', '-i', audio_file,
+            ffmpeg_exe, '-i', audio_file,
             '-i', jpg_file,
             '-map', '0:a',
             '-map', '1:v',
@@ -565,7 +573,19 @@ class Spotify2MP3GUI:
         self.status_label.config(text=f"✅ Completed in {timedelta(seconds=int(time.time() - start_time))}")
         self.root.bell()
 
-
+    def update_artwork_options(self):
+        # If thumbnail embedding is selected, disable Spotify art
+        if self.thumb_var.get():
+            self.spotify_art_var.set(False)
+            self.spotify_art_check.config(state=tk.DISABLED)
+        # If Spotify art is selected, disable thumbnail embedding
+        elif self.spotify_art_var.get():
+            self.thumb_var.set(False)
+            self.thumb_check.config(state=tk.DISABLED)
+        # If neither is selected, enable both
+        else:
+            self.thumb_check.config(state=tk.NORMAL)
+            self.spotify_art_check.config(state=tk.NORMAL)
 
 if __name__ == '__main__':
     if _tkdnd_imported:
