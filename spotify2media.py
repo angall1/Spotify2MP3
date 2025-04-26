@@ -22,6 +22,7 @@ except ImportError:
 DND_AVAILABLE = False
 from pathlib import PureWindowsPath
 import webbrowser
+import platform
 
 def resource_path(relative_path):
     if hasattr(sys, '_MEIPASS'):
@@ -213,10 +214,23 @@ class Spotify2MP3GUI:
         downloaded = []
 
         cfg = self.config
-        ffmpeg_path = resource_path('ffmpeg')
-        ffmpeg_exe = os.path.join(ffmpeg_path, 'ffmpeg.exe')
+        if platform.system() == "Darwin":  # macOS
+            ffmpeg_path = resource_path("ffmpeg")
+            ffmpeg_exe = os.path.join(ffmpeg_path, "ffmpeg")
+            yt_dlp_path = resource_path("yt-dlp")
+            yt_dlp_exe = os.path.join(yt_dlp_path, "yt-dlp")
+        else:
+            ffmpeg_path = resource_path("ffmpeg")
+            ffmpeg_exe = os.path.join(ffmpeg_path, "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg")
+            yt_dlp_path = resource_path("yt-dlp")
+            yt_dlp_exe = os.path.join(yt_dlp_path, "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp")
+
         if not os.path.isfile(ffmpeg_exe):
-            messagebox.showerror('Missing FFmpeg', 'ffmpeg.exe not found.')
+            messagebox.showerror("Missing FFmpeg","ffmpeg not found. Please install FFmpeg and ensure it's in your PATH.")
+            return
+
+        if not os.path.isfile(yt_dlp_exe):
+            messagebox.showerror("Missing yt-dlp","yt-dlp not found. Please install yt-dlp and ensure it's in your PATH.")
             return
 
         log_path = os.path.join(output_dir, 'error.log')
@@ -235,7 +249,7 @@ class Spotify2MP3GUI:
             for variant in cfg['variants']:
                 q = f"{safe_title} {safe_artist} {variant}".strip()
                 self.status_label.config(text=f"[{i}/{total}] Searching: {q}")
-                yt_dlp = resource_path('yt-dlp.exe')
+                yt_dlp = yt_dlp_exe
                 cmd = [yt_dlp, f'--ffmpeg-location={ffmpeg_path}', '-f', 'bestaudio[ext=m4a]/bestaudio']
                 # Thumbnail embedding
                 if self.thumb_var.get():
