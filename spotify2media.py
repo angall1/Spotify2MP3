@@ -386,35 +386,25 @@ class Spotify2MP3GUI:
                 chrome_options.add_argument('--no-sandbox')
                 chrome_options.add_argument('--disable-dev-shm-usage')
                 
-                # Set Chrome binary location based on platform
-                if platform.system() == "Darwin":
-                    chrome_options.binary_location = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-                elif platform.system() == "Windows":
-                    # Check for Chrome in common Windows locations
-                    chrome_paths = [
-                        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',   # Windows x64
-                        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'  # Windows x32
-                    ]
-                    for path in chrome_paths:
-                        if os.path.exists(path):
-                            chrome_options.binary_location = path
-                            break
-                    else:
+                chrome_paths = [
+                        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',  # macOS
+                        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',   # Windows
+                        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'  # Windows (x86)
+                ]
+                    
+                chrome_found = False
+                for path in chrome_paths:
+                    if os.path.exists(path):
+                        chrome_options.binary_location = path
+                        chrome_found = True
+                        break
+                    
+                    if not chrome_found:
                         messagebox.showerror('Error', 'Google Chrome not found. Please install Chrome browser to use this feature.')
                         return
                 
-                # Initialize the Chrome driver with specific options for each platform
-                if platform.system() == "Darwin" and platform.machine() == "arm64":
-                    service = Service(ChromeDriverManager(version="mac_arm64").install())
-                elif platform.system() == "Windows":
-                    # Check if running on 64-bit Windows
-                    if platform.architecture()[0] == '64bit':
-                        service = Service(ChromeDriverManager(version="win64").install())
-                    else:
-                        service = Service(ChromeDriverManager(version="win32").install())
-                else:
-                    service = Service(ChromeDriverManager().install())
-                
+                # Initialize the Chrome driver
+                service = Service(ChromeDriverManager().install())
                 driver = webdriver.Chrome(service=service, options=chrome_options)
                 
                 # Navigate to spotifycover.art
