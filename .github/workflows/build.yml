@@ -5,7 +5,7 @@ on:
     inputs:
       version:
         description: 'Version to create'
-        default: '1.2.8'
+        default: '1.3.0'
         required: true
         type: string
 
@@ -56,10 +56,6 @@ jobs:
           --icon=icon.ico `
           spotify2media.py
 
-    - name: Zip the app
-      run: |
-        Compress-Archive -Path "dist\Spotify2MP3.exe" -DestinationPath "dist\Spotify2MP3_Windows.zip" -Force
-        
     - name: Create GitHub Draft
       uses: softprops/action-gh-release@v1
       with:
@@ -67,7 +63,8 @@ jobs:
         name: Spotify2MP3 v${{ env.LEVEL }}
         draft: true
         prerelease: false
-        files: dist/Spotify2MP3_Windows.zip
+        files: dist/Spotify2MP3_Windows.exe
+        
   build-macos:
     runs-on: macos-latest
     

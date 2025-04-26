@@ -155,7 +155,7 @@ class Spotify2MP3GUI:
 
         # Spotify album art option
         self.spotify_art_var = tk.BooleanVar(value=False)
-        self.spotify_art_check = tk.Checkbutton(self.root, text='Get album art from Spotify (Requires Chrome)', variable=self.spotify_art_var, command=self.update_artwork_options)
+        self.spotify_art_check = tk.Checkbutton(self.root, text='Get and Embed album art from Spotify (Requires Chrome)', variable=self.spotify_art_var, command=self.update_artwork_options)
         self.spotify_art_check.pack(pady=2)
         Tooltip(self.spotify_art_check, 'Download album art from Spotify using spotifycover.art')
         
