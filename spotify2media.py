@@ -405,13 +405,13 @@ class Spotify2MP3GUI:
                 
                 # Initialize the Chrome driver with specific options for each platform
                 if platform.system() == "Darwin" and platform.machine() == "arm64":
-                    service = Service(ChromeDriverManager(os_type="mac_arm64").install())
+                    service = Service(ChromeDriverManager(version="mac_arm64").install())
                 elif platform.system() == "Windows":
                     # Check if running on 64-bit Windows
                     if platform.architecture()[0] == '64bit':
-                        service = Service(ChromeDriverManager(os_type="win64").install())
+                        service = Service(ChromeDriverManager(version="win64").install())
                     else:
-                        service = Service(ChromeDriverManager(os_type="win32").install())
+                        service = Service(ChromeDriverManager(version="win32").install())
                 else:
                     service = Service(ChromeDriverManager().install())
                 
