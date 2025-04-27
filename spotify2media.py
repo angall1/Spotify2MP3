@@ -114,7 +114,7 @@ class Spotify2MP3GUI:
             Tooltip(self.drop_frame, 'Drag & drop not available\nInstall tkinterdnd2 to enable.')
 
     def setup_ui(self):
-        instr = tk.Label(self.root, text='Download CSV via Exportify: https://exportify.net/', fg='blue', cursor='hand2')
+        instr = tk.Label(self.root, text='Download Spotify CSV via Exportify: https://exportify.net/', fg='blue', cursor='hand2')
         instr.pack(fill='x', padx=20)
         instr.bind('<Button-1>', lambda e: webbrowser.open('https://exportify.net/'))
         instr = tk.Label(self.root, text='Download other CSVs (Apple Music, Youtube Music, etc) \n via TuneMyMusic: https://tunemymusic.com/transfer/', fg='blue', cursor='hand2')
@@ -159,7 +159,7 @@ class Spotify2MP3GUI:
 
         # Spotify album art option
         self.spotify_art_var = tk.BooleanVar(value=False)
-        self.spotify_art_check = tk.Checkbutton(self.root, text='Get and Embed album art from Spotify (Requires Chrome)', variable=self.spotify_art_var, command=self.update_artwork_options)
+        self.spotify_art_check = tk.Checkbutton(self.root, text='Get and embed album art from Spotify link (Requires Chrome)', variable=self.spotify_art_var, command=self.update_artwork_options)
         self.spotify_art_check.pack(pady=2)
         Tooltip(self.spotify_art_check, 'Download album art from Spotify using spotifycover.art')
         
@@ -171,7 +171,9 @@ class Spotify2MP3GUI:
         self.spotify_link_entry = tk.Entry(self.spotify_link_frame)
         self.spotify_link_entry.pack(side='left', fill='x', expand=True, padx=(5,0))
         self.spotify_link_entry.insert(0, 'https://open.spotify.com/playlist/')
+        self.spotify_link_frame.pack_forget()
         self.spotify_link_entry.config(state='normal')
+        self.spotify_art_var.trace_add('write', self.toggle_spotify_link)
         Tooltip(self.spotify_link_entry, 'Enter Spotify playlist/album link')
 
         self.convert_button = tk.Button(self.root, text='Convert Playlist', command=self.start_conversion, state=tk.DISABLED)
@@ -190,6 +192,17 @@ class Spotify2MP3GUI:
         self.progress.pack(pady=10)
         self.status_label = tk.Label(self.root, text='Status: Waiting...', anchor='w')
         self.status_label.pack(fill='x', padx=20)
+
+    def toggle_spotify_link(self, *args):
+        if self.spotify_art_var.get():
+            self.spotify_link_frame.pack(
+                fill='x',
+                padx=20,
+                pady=(0, 10),
+                after=self.spotify_art_check
+            )
+        else:
+            self.spotify_link_frame.pack_forget()
 
     def open_settings(self):
         # ... existing settings code ...
