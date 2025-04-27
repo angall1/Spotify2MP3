@@ -25,6 +25,9 @@ from pathlib import PureWindowsPath
 import webbrowser
 import platform
 
+DEFAULT_DROP_BG = '#e0e0e0'
+LOADED_DROP_BG  = '#c0ffc0'
+
 def resource_path(relative_path):
     if hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
@@ -34,9 +37,13 @@ CONFIG_FILE = resource_path('config.json')
 
 def load_config():
     default = {
-        'variants': ['Official Audio', ''],
-        'duration_min': 60,
-        'duration_max': 600
+        "variants": [
+            "Official Audio"
+        ],
+        "duration_min": 60,
+        "duration_max": 600,
+        "transcode_mp3": "false",
+        "generate_m3u": "true"
     }
     if os.path.isfile(CONFIG_FILE):
         try:
@@ -73,7 +80,7 @@ class Spotify2MP3GUI:
     def __init__(self, root):
         self.root = root
         self.root.title('Spotify2MP3')
-        self.root.geometry('540x550')
+        self.root.geometry('540x600')
         self.root.minsize(520, 550)
         self.csv_path = None
         self.output_folder = None
@@ -123,9 +130,10 @@ class Spotify2MP3GUI:
 
         # CSV Input
         tk.Label(self.root, text='1) Drag and drop CSV File:', anchor='w').pack(fill='x', padx=20)
-        self.drop_frame = tk.Frame(self.root, bg='#e0e0e0', height=180)
-        self.drop_frame.pack(pady=5, padx=20, fill='x')
-        self.drop_label = tk.Label(self.drop_frame, text='CSV file: None', bg='#e0e0e0')
+        self.drop_frame = tk.Frame(self.root, bg='#e0e0e0', height=50, width= 400)
+        self.drop_frame.pack(pady=5, padx=20, expand=False)
+        self.drop_frame.pack_propagate(False)  
+        self.drop_label = tk.Label(self.drop_frame, text='CSV file: None', bg='#e0e0e0', font=("Arial", 12), wraplength=380, justify='center')
         self.drop_label.pack(expand=True, fill='both')
         self.drop_label.bind('<Button-1>', self.browse_csv)
         Tooltip(self.drop_frame, 'Drop your playlist CSV here or click to browse.')
@@ -197,15 +205,18 @@ class Spotify2MP3GUI:
 
         # Actions
         tk.Label(self.root, text='4) Actions:', anchor='w').pack(fill='x', padx=20, pady=(10,0))
-        self.open_folder_button = tk.Button(self.root, text='Open Output Folder', command=self.open_output_folder)
-        self.open_folder_button.pack(pady=5)
-        Tooltip(self.open_folder_button, 'Open folder with converted files.')
+    
 
         # Progress
         self.status_label = tk.Label(self.root, text='Status: Waiting...', anchor='w', font=('Arial', 12))
         self.status_label.pack(fill='x', padx=20)
         self.progress = ttk.Progressbar(self.root, orient='horizontal', length=500, mode='determinate')
         self.progress.pack(pady=10)
+
+        #output folder
+        self.open_folder_button = tk.Button(self.root, text='Open Output Folder', command=self.open_output_folder)
+        self.open_folder_button.pack(pady=5)
+        Tooltip(self.open_folder_button, 'Open folder with converted files.')
 
         #hide useless buttons
         self.mp3_check.pack_forget()
@@ -285,10 +296,13 @@ class Spotify2MP3GUI:
     def clear_selection(self):
         self.csv_path = None
         self.drop_label.config(text='CSV file: None')
-        self.progress['value'] = 0
         self.status_label.config(text='Status: Waiting...')
+        # ← reset:
+        self.drop_frame.config(bg=DEFAULT_DROP_BG)
+        self.drop_label.config(bg=DEFAULT_DROP_BG)
+        self.progress['value'] = 0
         self.update_convert_button_state()
-
+    
     def browse_csv(self, event=None):
         path = filedialog.askopenfilename(
             initialdir=self.last_directory,
@@ -296,9 +310,12 @@ class Spotify2MP3GUI:
         )
         if path:
             self.csv_path = path
-            self.last_directory = os.path.dirname(path)  # Update last directory
+            self.last_directory = os.path.dirname(path)
             self.drop_label.config(text=f'CSV file: {os.path.basename(path)}')
             self.status_label.config(text='CSV loaded.')
+            # ← highlight:
+            self.drop_frame.config(bg=LOADED_DROP_BG)
+            self.drop_label.config(bg=LOADED_DROP_BG)
             self.update_convert_button_state()
 
     def select_output_folder(self):
@@ -335,6 +352,8 @@ class Spotify2MP3GUI:
             self.csv_path = path
             self.drop_label.config(text=f'CSV file: {os.path.basename(path)}')
             self.status_label.config(text='CSV loaded via drag.')
+            self.drop_frame.config(bg=LOADED_DROP_BG)
+            self.drop_label.config(bg=LOADED_DROP_BG)
             self.update_convert_button_state()
 
     def get_file_timestamps(self, file_path):
