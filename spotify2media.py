@@ -102,6 +102,7 @@ class Spotify2MP3GUI:
         except Exception as e:
             print(f"Warning: Could not load icon: {e}")
             # No fallback needed - app will run without icon
+
         if _tkdnd_imported:
             try:
                 root.drop_target_register(DND_FILES)
@@ -579,6 +580,7 @@ class Spotify2MP3GUI:
         self.status_label.config(text=f"✅ Completed in {timedelta(seconds=int(time.time() - start_time))}")
         self.root.bell()
 
+
     def update_artwork_options(self):
         # If thumbnail embedding is selected, disable Spotify art
         if self.thumb_var.get():
@@ -592,6 +594,7 @@ class Spotify2MP3GUI:
         else:
             self.thumb_check.config(state=tk.NORMAL)
             self.spotify_art_check.config(state=tk.NORMAL)
+
 
 if __name__ == '__main__':
     if _tkdnd_imported:
