@@ -1,1 +1,9 @@
-{"variants": ["Official Audio", ""], "duration_min": 60, "duration_max": 600}
+{
+    "variants": [
+        "Official Audio"
+    ],
+    "duration_min": 60,
+    "duration_max": 600,
+    "transcode_mp3": false,
+    "generate_m3u": true
+}

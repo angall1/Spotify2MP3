@@ -73,8 +73,8 @@ class Spotify2MP3GUI:
     def __init__(self, root):
         self.root = root
         self.root.title('Spotify2MP3')
-        self.root.geometry('600x600')
-        self.root.minsize(520, 500)
+        self.root.geometry('540x550')
+        self.root.minsize(520, 550)
         self.csv_path = None
         self.output_folder = None
         self.last_output_dir = None
@@ -114,22 +114,27 @@ class Spotify2MP3GUI:
             Tooltip(self.drop_frame, 'Drag & drop not available\nInstall tkinterdnd2 to enable.')
 
     def setup_ui(self):
-        instr = tk.Label(self.root, text='Download Spotify CSV via Exportify: https://exportify.net/', fg='blue', cursor='hand2')
+        instr = tk.Label(self.root, text='Download Spotify CSV via Exportify: https://exportify.net/', fg='blue', cursor='hand2',font=("Arial", 12))
         instr.pack(fill='x', padx=20)
         instr.bind('<Button-1>', lambda e: webbrowser.open('https://exportify.net/'))
-        instr = tk.Label(self.root, text='Download other CSVs (Apple Music, Youtube Music, etc) \n via TuneMyMusic: https://tunemymusic.com/transfer/', fg='blue', cursor='hand2')
+        instr = tk.Label(self.root, text='Download other CSVs (Apple Music, Youtube Music, etc) \n via TuneMyMusic: https://tunemymusic.com/transfer/', fg='blue', cursor='hand2',font=("Arial", 12))
         instr.pack(fill='x', padx=20)
         instr.bind('<Button-1>', lambda e: webbrowser.open('https://www.tunemymusic.com/transfer/apple-music-to-file'))
 
         # CSV Input
-        tk.Label(self.root, text='1) CSV File:', anchor='w').pack(fill='x', padx=20)
+        tk.Label(self.root, text='1) Drag and drop CSV File:', anchor='w').pack(fill='x', padx=20)
         self.drop_frame = tk.Frame(self.root, bg='#e0e0e0', height=180)
         self.drop_frame.pack(pady=5, padx=20, fill='x')
         self.drop_label = tk.Label(self.drop_frame, text='CSV file: None', bg='#e0e0e0')
         self.drop_label.pack(expand=True, fill='both')
         self.drop_label.bind('<Button-1>', self.browse_csv)
-        Tooltip(self.drop_frame, 'Drop your Exportify CSV here or click to browse.')
+        Tooltip(self.drop_frame, 'Drop your playlist CSV here or click to browse.')
 
+
+        #CSV clear
+        self.clear_button = tk.Button(self.root, text='Clear CSV', command=self.clear_selection, state=tk.DISABLED)
+        self.clear_button.pack()
+        
         # Output folder
         tk.Label(self.root, text='2) Output Folder:', anchor='w').pack(fill='x', padx=20)
         self.folder_button = tk.Button(self.root, text='Choose Output Folder', command=self.select_output_folder)
@@ -137,6 +142,7 @@ class Spotify2MP3GUI:
         self.output_label = tk.Label(self.root, text='Output folder: Not selected', anchor='w')
         self.output_label.pack(fill='x', padx=20)
         Tooltip(self.folder_button, 'Where files will be saved.')
+        
 
         # Conversion options
         tk.Label(self.root, text='3) Conversion Options:', anchor='w').pack(fill='x', padx=20)
@@ -176,10 +182,18 @@ class Spotify2MP3GUI:
         self.spotify_art_var.trace_add('write', self.toggle_spotify_link)
         Tooltip(self.spotify_link_entry, 'Enter Spotify playlist/album link')
 
-        self.convert_button = tk.Button(self.root, text='Convert Playlist', command=self.start_conversion, state=tk.DISABLED)
+        # Settings button
+        self.settings_button = tk.Button(
+            self.root,
+            text="Settings",
+            command=self.open_settings
+        )
+        self.settings_button.pack(pady=5)
+
+
+        self.convert_button = tk.Button(self.root, text='Convert Playlist', command=self.start_conversion, state=tk.DISABLED, font=('Arial', 14) )
         self.convert_button.pack(pady=10)
-        self.clear_button = tk.Button(self.root, text='Clear', command=self.clear_selection, state=tk.DISABLED)
-        self.clear_button.pack()
+
 
         # Actions
         tk.Label(self.root, text='4) Actions:', anchor='w').pack(fill='x', padx=20, pady=(10,0))
@@ -188,10 +202,15 @@ class Spotify2MP3GUI:
         Tooltip(self.open_folder_button, 'Open folder with converted files.')
 
         # Progress
+        self.status_label = tk.Label(self.root, text='Status: Waiting...', anchor='w', font=('Arial', 12))
+        self.status_label.pack(fill='x', padx=20)
         self.progress = ttk.Progressbar(self.root, orient='horizontal', length=500, mode='determinate')
         self.progress.pack(pady=10)
-        self.status_label = tk.Label(self.root, text='Status: Waiting...', anchor='w')
-        self.status_label.pack(fill='x', padx=20)
+
+        #hide useless buttons
+        self.mp3_check.pack_forget()
+        self.quality_check.pack_forget()
+        self.m3u_check.pack_forget()
 
     def toggle_spotify_link(self, *args):
         if self.spotify_art_var.get():
@@ -205,8 +224,58 @@ class Spotify2MP3GUI:
             self.spotify_link_frame.pack_forget()
 
     def open_settings(self):
-        # ... existing settings code ...
-        pass
+        win = tk.Toplevel(self.root)
+        win.title("Settings")
+        win.grab_set()  # modal
+
+        # Variants
+        tk.Label(win, text="Variants (comma-separated):").grid(row=0, column=0, sticky="w", padx=10, pady=5)
+        variants_str = tk.StringVar(value=",".join(self.config.get("variants", [])))
+        variants_entry = tk.Entry(win, textvariable=variants_str, width=40)
+        variants_entry.grid(row=0, column=1, padx=10, pady=5)
+
+        # Min duration
+        tk.Label(win, text="Min Duration (s):").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+        min_var = tk.IntVar(value=self.config.get("duration_min", 60))
+        tk.Entry(win, textvariable=min_var).grid(row=1, column=1, padx=10, pady=5)
+
+        # Max duration
+        tk.Label(win, text="Max Duration (s):").grid(row=2, column=0, sticky="w", padx=10, pady=5)
+        max_var = tk.IntVar(value=self.config.get("duration_max", 600))
+        tk.Entry(win, textvariable=max_var).grid(row=2, column=1, padx=10, pady=5)
+
+        # Transcode & M3U options
+        tk.Label(win, text="Output options:").grid(row=3, column=0, sticky="w", padx=10, pady=(15,5))
+        mp3_cb = tk.Checkbutton(win, text="Transcode to MP3 (VBR0)", variable=self.mp3_var)
+        mp3_cb.grid(row=3, column=1, sticky="w", padx=10)
+        m3u_cb = tk.Checkbutton(win, text="Generate M3U playlist", variable=self.m3u_var)
+        m3u_cb.grid(row=4, column=1, sticky="w", padx=10, pady=(0,10))
+
+        # Buttons frame
+        btn_frame = tk.Frame(win)
+        btn_frame.grid(row=5, column=0, columnspan=2, pady=10)
+
+        def save():
+            try:
+                variants = [v.strip() for v in variants_str.get().split(",") if v.strip()]
+                cfg = {
+                    "variants": variants,
+                    "duration_min": int(min_var.get()),
+                    "duration_max": int(max_var.get()),
+                    "transcode_mp3": self.mp3_var.get(),
+                    "generate_m3u": self.m3u_var.get()
+                }
+                with open(CONFIG_FILE, "w") as f:
+                    json.dump(cfg, f, indent=4)
+                self.config = load_config()
+                win.destroy()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save settings:\n{e}")
+
+        # Save/Cancel buttons
+        tk.Button(btn_frame, text="Save",   command=save).pack(side="left", padx=5)
+        tk.Button(btn_frame, text="Cancel", command=win.destroy).pack(side="left", padx=5)
+
 
     def update_convert_button_state(self):
         ok = self.csv_path and os.path.isfile(self.csv_path) and self.csv_path.lower().endswith('.csv') and self.output_folder
