@@ -117,6 +117,9 @@ class Spotify2MP3GUI:
         instr = tk.Label(self.root, text='Download CSV via Exportify: https://exportify.net/', fg='blue', cursor='hand2')
         instr.pack(fill='x', padx=20)
         instr.bind('<Button-1>', lambda e: webbrowser.open('https://exportify.net/'))
+        instr = tk.Label(self.root, text='Download other CSVs (Apple Music, Youtube Music, etc) \n via TuneMyMusic: https://tunemymusic.com/transfer/', fg='blue', cursor='hand2')
+        instr.pack(fill='x', padx=20)
+        instr.bind('<Button-1>', lambda e: webbrowser.open('https://www.tunemymusic.com/transfer/apple-music-to-file'))
 
         # CSV Input
         tk.Label(self.root, text='1) CSV File:', anchor='w').pack(fill='x', padx=20)
@@ -477,8 +480,10 @@ class Spotify2MP3GUI:
         else:
             ffmpeg_path = resource_path("ffmpeg")
             ffmpeg_exe = os.path.join(ffmpeg_path, "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg")
+            print(ffmpeg_exe)
             yt_dlp_path = resource_path("yt-dlp")
             yt_dlp_exe = os.path.join(yt_dlp_path, "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp")
+            print(yt_dlp_exe)
 
         if not os.path.isfile(ffmpeg_exe):
             messagebox.showerror("Missing FFmpeg","ffmpeg not found. Please install FFmpeg and ensure it's in your PATH.")
