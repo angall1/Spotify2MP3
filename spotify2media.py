@@ -40,10 +40,11 @@ def load_config():
         "variants": [
             "Official Audio"
         ],
-        "duration_min": 60,
+        "duration_min": 30,
         "duration_max": 600,
         "transcode_mp3": "false",
-        "generate_m3u": "true"
+        "generate_m3u": "true",
+        "exclude_instrumentals": "false"
     }
     if os.path.isfile(CONFIG_FILE):
         try:
@@ -80,8 +81,8 @@ class Spotify2MP3GUI:
     def __init__(self, root):
         self.root = root
         self.root.title('Spotify2MP3')
-        self.root.geometry('540x600')
-        self.root.minsize(520, 550)
+        self.root.geometry('540x630')
+        self.root.minsize(300, 500)
         self.csv_path = None
         self.output_folder = None
         self.last_output_dir = None
@@ -93,6 +94,7 @@ class Spotify2MP3GUI:
             self.last_directory = os.path.expanduser("~/Downloads")
             
         self.config = load_config()
+        self.exclude_instr_var = tk.BooleanVar(value=self.config.get("exclude_instrumentals", False))
 
         self.setup_ui()
         if sys.platform == 'darwin':
@@ -122,21 +124,24 @@ class Spotify2MP3GUI:
 
     def setup_ui(self):
         instr = tk.Label(self.root, text='Download Spotify CSV via Exportify: https://exportify.net/', fg='blue', cursor='hand2',font=("Arial", 12))
+        Tooltip(instr, 'Use this link for downloading Spotify playlists.')
         instr.pack(fill='x', padx=20)
         instr.bind('<Button-1>', lambda e: webbrowser.open('https://exportify.net/'))
-        instr = tk.Label(self.root, text='Download other CSVs (Apple Music, Youtube Music, etc) \n via TuneMyMusic: https://tunemymusic.com/transfer/', fg='blue', cursor='hand2',font=("Arial", 12))
-        instr.pack(fill='x', padx=20)
-        instr.bind('<Button-1>', lambda e: webbrowser.open('https://www.tunemymusic.com/transfer/apple-music-to-file'))
+        instr2 = tk.Label(self.root, text='Download other CSVs (Apple Music, Youtube Music, etc) \n via TuneMyMusic: https://tunemymusic.com/transfer/', fg='blue', cursor='hand2',font=("Arial", 12))
+        Tooltip(instr2, 'Use this link for downloading from any other platform or for Spotify albums')
+        instr2.pack(fill='x', padx=20)
+        instr2.bind('<Button-1>', lambda e: webbrowser.open('https://www.tunemymusic.com/transfer/apple-music-to-file'))
 
         # CSV Input
         tk.Label(self.root, text='1) Drag and drop CSV File:', anchor='w').pack(fill='x', padx=20)
-        self.drop_frame = tk.Frame(self.root, bg='#e0e0e0', height=50, width= 400)
+        tk.Label(self.root, text='The playlist name will be the same as the CSV filename.', anchor='w').pack(fill='x', padx=20)
+        self.drop_frame = tk.Frame(self.root, bg='#e0e0e0', height=60, width= 400)
         self.drop_frame.pack(pady=5, padx=20, expand=False)
         self.drop_frame.pack_propagate(False)  
         self.drop_label = tk.Label(self.drop_frame, text='CSV file: None', bg='#e0e0e0', font=("Arial", 12), wraplength=380, justify='center')
         self.drop_label.pack(expand=True, fill='both')
         self.drop_label.bind('<Button-1>', self.browse_csv)
-        Tooltip(self.drop_frame, 'Drop your playlist CSV here or click to browse.')
+        Tooltip(self.drop_label, 'Drop your playlist CSV here or click to browse.')
 
 
         #CSV clear
@@ -145,9 +150,10 @@ class Spotify2MP3GUI:
         
         # Output folder
         tk.Label(self.root, text='2) Output Folder:', anchor='w').pack(fill='x', padx=20)
-        self.folder_button = tk.Button(self.root, text='Choose Output Folder', command=self.select_output_folder)
+        tk.Label(self.root, text='This will be the folder the playlist files will be outputted into.', anchor='w').pack(fill='x', padx=20)
+        self.folder_button = tk.Button(self.root, text='Choose Output Folder', command=self.select_output_folder, font=('Arial', 12))
         self.folder_button.pack(pady=5)
-        self.output_label = tk.Label(self.root, text='Output folder: Not selected', anchor='w')
+        self.output_label = tk.Label(self.root, text='Output folder: Not selected', anchor='w',)
         self.output_label.pack(fill='x', padx=20)
         Tooltip(self.folder_button, 'Where files will be saved.')
         
@@ -262,9 +268,18 @@ class Spotify2MP3GUI:
         m3u_cb = tk.Checkbutton(win, text="Generate M3U playlist", variable=self.m3u_var)
         m3u_cb.grid(row=4, column=1, sticky="w", padx=10, pady=(0,10))
 
+        tk.Label(win, text="Filter results:").grid(row=5, column=0, sticky="w", padx=10, pady=(10,5))
+        instr_cb = tk.Checkbutton(
+            win,
+            text="Exclude instrumental versions",
+            variable=self.exclude_instr_var
+        )
+        instr_cb.grid(row=5, column=1, sticky="w", padx=10)
+
         # Buttons frame
         btn_frame = tk.Frame(win)
-        btn_frame.grid(row=5, column=0, columnspan=2, pady=10)
+        btn_frame.grid(row=6, column=0, columnspan=2, pady=10)
+
 
         def save():
             try:
@@ -274,7 +289,8 @@ class Spotify2MP3GUI:
                     "duration_min": int(min_var.get()),
                     "duration_max": int(max_var.get()),
                     "transcode_mp3": self.mp3_var.get(),
-                    "generate_m3u": self.m3u_var.get()
+                    "generate_m3u": self.m3u_var.get(),
+                    "exclude_instrumentals": self.exclude_instr_var.get()
                 }
                 with open(CONFIG_FILE, "w") as f:
                     json.dump(cfg, f, indent=4)
@@ -605,9 +621,8 @@ class Spotify2MP3GUI:
             album = row.get('Album Name') or row.get('Album') or playlist_name
             safe_title = re.sub(r"[^\w\s]", '', title)
             safe_artist = re.sub(r"[^\w\s]", '', artist)
-
             new_files = []
-            for variant in cfg['variants']:
+            for variant in (cfg.get('variants') or ['']):
                 q = f"{safe_title} {safe_artist} {variant}".strip()
                 self.status_label.config(text=f"[{i}/{total}] Searching: {q}")
                 cmd = [yt_dlp_exe, f'--ffmpeg-location={ffmpeg_path}', '-f', 'bestaudio[ext=m4a]/bestaudio']
@@ -621,6 +636,8 @@ class Spotify2MP3GUI:
                 else:
                     cmd += ['--remux-video', 'm4a']
                 cmd += ['--output', os.path.join(output_dir, '%(title)s.%(ext)s'), '--no-playlist', f'ytsearch1:{q}']
+                if self.exclude_instr_var.get():
+                   cmd += ['--reject-title', '(?i)instrumental']
                 creationflags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
 
                 result = subprocess.run(cmd, capture_output=True, text=True, creationflags=creationflags)
