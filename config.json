@@ -6,5 +6,5 @@
     "duration_max": 600,
     "transcode_mp3": false,
     "generate_m3u": true,
-    "exclude_instrumentals": true
+    "exclude_instrumentals": false
 }
