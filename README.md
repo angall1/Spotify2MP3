@@ -1,6 +1,6 @@
 # Spotify2MP3
 
-Spotify2MP3 is a cross-platform standalone app (Windows EXE, macOS .app) that takes a playlist CSV—exported from Spotify via [Exportify](https://exportify.net), Apple Music/YouTube Music via [TuneMyMusic](https://tunemymusic.com), or any other service—and batch-downloads every track as **M4A** (remuxed at up to the original 128 kbps AAC bitrate) or **high-quality MP3** (VBR 0). Everything’s bundled—no Python or external installs required.
+Spotify2MP3 is a cross-platform standalone app (Windows EXE, macOS .app) that takes a playlist CSV exported from Spotify via [Exportify](https://exportify.net), Apple Music/YouTube Music via [TuneMyMusic](https://tunemymusic.com), or any other service and batch downloads every track as **M4A** (remuxed at up to the original 128 kbps AAC bitrate) or **high-quality MP3** (VBR 0). Everything’s bundled, no Python or external installs required.
 
 ---
 
@@ -28,7 +28,7 @@ Grab the latest build from the [Releases page](https://github.com/angall1/Spotif
    - **Other tweaks**  
 6. Hit **Convert Playlist**.  
 
-It will fetch each track—remuxing to M4A or re-encoding to MP3 VBR 0—automatically tag title/artist/album/track number, and (if enabled) create a `.m3u` file.
+It will fetch each track remuxing to M4A or re-encoding to MP3 VBR 0—automatically tag title/artist/album/track number, and (if enabled) create a `.m3u` file.
 
 ---
 
