@@ -179,7 +179,7 @@ class Spotify2MP3GUI:
 
         # Spotify album art option
         self.spotify_art_var = tk.BooleanVar(value=False)
-        self.spotify_art_check = tk.Checkbutton(self.root, text='Get and embed album art from Spotify link (Requires Chrome)', variable=self.spotify_art_var, command=self.update_artwork_options)
+        self.spotify_art_check = tk.Checkbutton(self.root, text='Get and embed album art from Spotify link (Requires Chrome or Firefox)', variable=self.spotify_art_var, command=self.update_artwork_options)
         self.spotify_art_check.pack(pady=2)
         Tooltip(self.spotify_art_check, 'Download album art from Spotify using spotifycover.art')
         
@@ -437,13 +437,19 @@ class Spotify2MP3GUI:
         match = re.match(r'^(\d+)_', filename)
         return int(match.group(1)) if match else float('inf')
 
-    def rename_album_art(self, output_dir):
+    def rename_album_art(self, output_dir, not_found_songs=None):
+        if not_found_songs is None:
+            not_found_songs = []
+            
+        # Create a set of failed song track numbers for faster lookup
+        failed_track_numbers = {song['Track Number'] for song in not_found_songs}
+        
         # Get all audio files (MP3 and M4A) and JPG files
         audio_files = [f for f in os.listdir(output_dir) if f.lower().endswith(('.mp3', '.m4a'))]
         jpg_files = [f for f in os.listdir(output_dir) if f.endswith('.jpg')]
         
-        # Sort audio files by modification time
-        audio_files.sort(key=lambda x: self.get_modified_time(os.path.join(output_dir, x)))
+        # Sort audio files by creation time (date added)
+        audio_files.sort(key=lambda x: os.path.getctime(os.path.join(output_dir, x)))
         
         # Sort JPG files by their number prefix
         jpg_files.sort(key=self.get_jpg_number)
@@ -454,11 +460,20 @@ class Spotify2MP3GUI:
             print("Will process as many files as possible.")
         
         # Process files in pairs
-        for i, (audio_file, jpg_file) in enumerate(zip(audio_files, jpg_files)):
-            print(f"\nProcessing pair {i + 1}:")
-            print(f"Audio file: {audio_file}")
-            print(f"Current JPG: {jpg_file}")
+        i = 0
+        while i < len(audio_files) and i < len(jpg_files):
+            audio_file = audio_files[i]
+            jpg_file = jpg_files[i]
             
+            # Get the track number from the JPG filename
+            jpg_number = self.get_jpg_number(jpg_file)
+            
+            # Skip if this track number was in the failed songs list
+            if jpg_number in failed_track_numbers:
+                # Remove only the JPG file from the list
+                jpg_files.pop(i)
+                continue
+                
             # Generate new jpg filename based on audio filename
             new_jpg_name = self.clean_filename_for_artwork(audio_file) + '.jpg'
             print(f"New JPG name: {new_jpg_name}")
@@ -471,17 +486,132 @@ class Spotify2MP3GUI:
                 print(f"Successfully renamed {jpg_file} to {new_jpg_name}")
             except Exception as e:
                 print(f"Error renaming file: {e}")
+            
+            i += 1
 
-    def embed_all_artwork(self, output_dir):
-        # Get all audio files (both M4A and MP3)
+    def embed_all_artwork(self, output_dir, not_found_songs=None):
+        """Embed artwork for all audio files, skipping songs that weren't found"""
+        if not_found_songs is None:
+            not_found_songs = []
+            
+        print("\n=== Starting metadata and artwork embedding process ===")
+        print(f"Number of not found songs: {len(not_found_songs)}")
+        if not_found_songs:
+            print("Not found songs:")
+            for song in not_found_songs:
+                print(f"  Track {song['Track Number']}: {song['Track Name']} by {song['Artist Name(s)']}")
+            
+        # Create a set of failed song track numbers for faster lookup
+        failed_track_numbers = {song['Track Number'] for song in not_found_songs}
+        print(f"Failed track numbers: {failed_track_numbers}")
+        
+        # Read CSV file once and store in memory
+        csv_data = []
+        try:
+            with open(self.csv_path, 'r', encoding='utf-8') as csvfile:
+                reader = csv.DictReader(csvfile)
+                # Filter out failed tracks from CSV data
+                csv_data = [row for i, row in enumerate(reader, 1) if i not in failed_track_numbers]
+                print(f"\nLoaded {len(csv_data)} entries from CSV file (excluding failed tracks)")
+                print("First few CSV entries:")
+                for i, row in enumerate(csv_data[:3]):
+                    print(f"Entry {i+1}:")
+                    print(f"  Title: {row.get('Track Name') or row.get('Track name')}")
+                    print(f"  Artist: {row.get('Artist Name(s)') or row.get('Artist name')}")
+                    print(f"  Album: {row.get('Album Name') or row.get('Album')}")
+        except Exception as e:
+            print(f"Error reading CSV file: {str(e)}")
+            return
+        
+        # Get all audio files (both M4A and MP3) and JPG files
         audio_files = [f for f in os.listdir(output_dir) if f.lower().endswith(('.m4a', '.mp3'))]
+        jpg_files = [f for f in os.listdir(output_dir) if f.endswith('.jpg')]
+        
+        print(f"\nFound {len(audio_files)} audio files and {len(jpg_files)} JPG files")
+        
+        # Sort audio files by creation time (date added)
+        audio_files.sort(key=lambda x: os.path.getctime(os.path.join(output_dir, x)))
+        
+        print("\nAudio files sorted by creation time:")
+        for i, f in enumerate(audio_files):
+            print(f"{i+1}. {f}")
+            
+        print("\nJPG files:")
+        for i, f in enumerate(jpg_files):
+            print(f"{i+1}. {f}")
+        
+        # Process files in pairs
+        csv_index = 0  # Separate index for CSV data
         for audio_file in audio_files:
-            jpg_file = os.path.splitext(audio_file)[0] + '.jpg'
-            jpg_path = os.path.join(output_dir, jpg_file)
-            if os.path.exists(jpg_path):
-                self.embed_artwork(os.path.join(output_dir, audio_file), jpg_path)
+            print(f"\nProcessing audio file: {audio_file}")
+            
+            # Find matching JPG file by base name
+            audio_base = os.path.splitext(audio_file)[0]
+            matching_jpg = None
+            for jpg_file in jpg_files:
+                jpg_base = os.path.splitext(jpg_file)[0]
+                if jpg_base == audio_base:
+                    matching_jpg = jpg_file
+                    break
+            
+            if matching_jpg:
+                print(f"Found matching JPG: {matching_jpg}")
+                try:
+                    audio_path = os.path.join(output_dir, audio_file)
+                    jpg_path = os.path.join(output_dir, matching_jpg)
+                    
+                    # Get metadata from CSV in the same order
+                    if csv_index < len(csv_data):
+                        row = csv_data[csv_index]
+                        title = row.get('Track Name') or row.get('Track name') or 'Unknown'
+                        artist = row.get('Artist Name(s)') or row.get('Artist name') or 'Unknown'
+                        album = row.get('Album Name') or row.get('Album') or 'Unknown'
+                        print(f"\nUsing metadata from CSV (row {csv_index+1}):")
+                        print(f"  Title: {title}")
+                        print(f"  Artist: {artist}")
+                        print(f"  Album: {album}")
+                        csv_index += 1
+                    else:
+                        print(f"No matching artwork found for {audio_file} (expected {jpg_file})")
+                        title = os.path.splitext(audio_file)[0]
+                        artist = 'Unknown Artist'
+                        album = 'Unknown Album'
+                        print(f"\nNo matching CSV row found, using defaults:")
+                        print(f"  Title: {title}")
+                        print(f"  Artist: {artist}")
+                        print(f"  Album: {album}")
+                    
+                    if audio_file.lower().endswith('.m4a'):
+                        print("\nEmbedding metadata for M4A file...")
+                        audio = MP4(audio_path)
+                        tags = audio.tags or MP4Tags()
+                        tags['\xa9nam'] = [title]  # Title
+                        tags['\xa9ART'] = [artist]  # Artist
+                        tags['\xa9alb'] = [album]  # Album
+                        audio.save()
+                        print("M4A metadata embedded successfully")
+                    else:  # MP3
+                        print("\nEmbedding metadata for MP3 file...")
+                        try:
+                            audio = EasyID3(audio_path)
+                        except:
+                            audio = EasyID3()
+                        audio['title'] = title
+                        audio['artist'] = artist 
+                        audio['album'] = album
+                        audio.save()
+                        print("MP3 metadata embedded successfully")
+                    
+                    # Embed artwork
+                    print(f"\nEmbedding artwork from: {matching_jpg}")
+                    self.embed_artwork(audio_path, jpg_path)
+                    
+                except Exception as e:
+                    print(f"Error processing {audio_file}: {str(e)}")
             else:
-                print(f"No matching artwork found for {audio_file} (expected {jpg_file})")
+                print(f"No matching JPG file found for {audio_file}")
+            
+            print(f"=== Finished processing {audio_file} ===\n")
 
     def convert_playlist(self):
         start_time = time.time()
@@ -492,217 +622,389 @@ class Spotify2MP3GUI:
         self.last_output_dir = output_dir
         downloaded = []
 
-        # Handle Spotify album art if enabled
-        if self.spotify_art_var.get():
-            try:
-                from selenium import webdriver
-                from selenium.webdriver.common.by import By
-                from selenium.webdriver.common.keys import Keys
-                from selenium.webdriver.support.ui import WebDriverWait
-                from selenium.webdriver.support import expected_conditions as EC
-                from webdriver_manager.chrome import ChromeDriverManager
-                from selenium.webdriver.chrome.service import Service
-                import tempfile
-                import shutil
-            
-                spotify_link = self.spotify_link_entry.get()
-                if not spotify_link or spotify_link == 'https://www.spotifycover.art':
-                    messagebox.showerror('Error', 'Please enter a valid Spotify link')
-                    return
-                
-                # Create a temporary directory for album art
-                temp_dir = tempfile.mkdtemp()
-                
-                # Setup Chrome options
-                chrome_options = webdriver.ChromeOptions()
-                chrome_options.add_argument('--headless')
-                chrome_options.add_argument('--no-sandbox')
-                chrome_options.add_argument('--disable-dev-shm-usage')
-                
+        not_found_songs = []  # List to track songs that weren't found
+
+        # Store initial state
+        initial_state = {
+            'cursor': self.root.cget('cursor'),
+            'convert_button_state': self.convert_button.cget('state'),
+            'clear_button_state': self.clear_button.cget('state'),
+            'progress_value': self.progress['value'],
+            'status_text': self.status_label.cget('text')
+        }
+
+        try:
+            # Handle Spotify album art if enabled
+            if self.spotify_art_var.get():
+                # Check for browsers first, before any imports
                 chrome_paths = [
-                        os.path.join(os.environ.get('PROGRAMFILES', 'C:/Program Files'), 'Google/Chrome/Application/chrome.exe'),
-                        os.path.join(os.environ.get('PROGRAMFILES(X86)', 'C:/Program Files (x86)'), 'Google/Chrome/Application/chrome.exe'),
-                        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',  # macOS
+                    os.path.join(os.environ.get('PROGRAMFILES', 'C:/Program Files'), 'Google/Chrome/Application/chrome.exe'), # Windows 64 bit
+                    os.path.join(os.environ.get('PROGRAMFILES(X86)', 'C:/Program Files (x86)'), 'Google/Chrome/Application/chrome.exe'), # Windows 32 bit
+                    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',  # macOS
+                    '/usr/bin/google-chrome', # Linux
                 ]
-                    
-                chrome_found = False
+                
+                firefox_paths = [
+                    os.path.join(os.environ.get('PROGRAMFILES', 'C:/Program Files'), 'Mozilla Firefox/firefox.exe'), # Windows 64 bit
+                    os.path.join(os.environ.get('PROGRAMFILES(X86)', 'C:/Program Files (x86)'), 'Mozilla Firefox/firefox.exe'), # Windows 32 bit
+                    '/Applications/Firefox.app/Contents/MacOS/firefox',  # macOS
+                    '/usr/bin/firefox' # Linux
+                ]
+                
+                browser_found = False
+                browser_type = None
+                browser_path = None
+                
+                # Check Chrome first
                 for path in chrome_paths:
                     if os.path.exists(path):
-                        chrome_options.binary_location = path
-                        chrome_found = True
+                        browser_found = True
+                        browser_type = 'chrome'
+                        browser_path = path
                         break
-                    
-                    if not chrome_found:
-                        messagebox.showerror('Error', 'Google Chrome not found. Please install Chrome browser to use this feature.')
+                
+                # If Chrome not found, check Firefox
+                if not browser_found:
+                    for path in firefox_paths:
+                        if os.path.exists(path):
+                            browser_found = True
+                            browser_type = 'firefox'
+                            browser_path = path
+                            break
+                
+                if not browser_found:
+                    self.restore_state(initial_state)
+                    messagebox.showerror('Error', 'Neither Google Chrome nor Firefox found. Please install one of these browsers to use this feature.')
+                    return
+
+                try:
+                    from selenium import webdriver
+                    from selenium.webdriver.common.by import By
+                    from selenium.webdriver.common.keys import Keys
+                    from selenium.webdriver.support.ui import WebDriverWait
+                    from selenium.webdriver.support import expected_conditions as EC
+                    from webdriver_manager.chrome import ChromeDriverManager
+                    from webdriver_manager.firefox import GeckoDriverManager
+                    from selenium.webdriver.chrome.service import Service as ChromeService
+                    from selenium.webdriver.firefox.service import Service as FirefoxService
+                    import tempfile
+                    import shutil
+                
+                    # Then check Spotify link
+                    spotify_link = self.spotify_link_entry.get()
+                    if not spotify_link or spotify_link == 'https://www.spotifycover.art':
+                        self.restore_state(initial_state)
+                        messagebox.showerror('Error', 'Please enter a valid Spotify link')
                         return
-                
-                # Initialize the Chrome driver
-                service = Service(ChromeDriverManager().install())
-                driver = webdriver.Chrome(service=service, options=chrome_options)
-                
-                # Navigate to spotifycover.art
-                driver.get('https://www.spotifycover.art')
-                
-                # Wait for the input box to be present
-                input_box = WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, 'textarea#linkInput'))
-                )
-                
-                # Clear the input box and enter the Spotify link
-                input_box.send_keys(spotify_link)
-                input_box.send_keys(Keys.RETURN)
-                
-                # Wait for the download button to be present and click it
-                download_button = WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, "button#downloadAllBtn"))
-                )
-                download_button.click()
-                
-                # Wait for the download to complete (you might need to adjust this based on the website's behavior)
-                time.sleep(10)
-                driver.quit()
-                
-                # Find and move zip file from downloads to output directory
-                if platform.system() == "Windows":
-                    downloads_dir = os.path.join(os.path.expanduser("~"), "Downloads")
-                else:
-                    downloads_dir = os.path.expanduser("~/Downloads")
                     
-                for file in os.listdir(downloads_dir):
-                    if file.endswith('.zip'):
-                        zip_path = os.path.join(downloads_dir, file)
-                        new_zip_path = os.path.join(output_dir, file)
-                        shutil.move(zip_path, new_zip_path)
+                    # Create a temporary directory for album art
+                    temp_dir = tempfile.mkdtemp()
+                    
+                    # Setup browser options based on browser type
+                    if browser_type == 'chrome':
+                        options = webdriver.ChromeOptions()
+                        options.add_argument('--headless')
+                        options.add_argument('--no-sandbox')
+                        options.add_argument('--disable-dev-shm-usage')
+                        options.binary_location = browser_path
+                        service = ChromeService(ChromeDriverManager().install())
+                        driver = webdriver.Chrome(service=service, options=options)
+                    else:  # firefox
+                        options = webdriver.FirefoxOptions()
+                        options.add_argument('--headless')
+                        options.add_argument('-p "default"')
+                        options.binary_location = browser_path
+                        service = FirefoxService(GeckoDriverManager().install())
+                        driver = webdriver.Firefox(service=service, options=options)
+
+                    driver.set_page_load_timeout(30)  # Set page load timeout to 30 seconds
+                    
+                    try:
+                        # Navigate to spotifycover.art
+                        driver.get('https://www.spotifycover.art')
                         
-                        # Extract zip file
-                        with zipfile.ZipFile(new_zip_path, 'r') as zip_ref:
-                            zip_ref.extractall(output_dir)
-                        os.remove(new_zip_path)
-                
-                # Move extracted jpg files to output directory        
-                for file in os.listdir(output_dir):
-                    if file.endswith('.jpg'):
-                        # Files are already in output_dir, no need to move
-                        pass
-            except Exception as e:
-                messagebox.showerror('Error', f'Failed to download Spotify album art: {str(e)}')
+                        # Wait for the page to load completely
+                        time.sleep(2)  # Give the page time to fully render
+                        
+                        # Wait for the input box to be present with a timeout
+                        input_box = WebDriverWait(driver, 20).until(
+                            EC.presence_of_element_located((By.CSS_SELECTOR, 'textarea#linkInput'))
+                        )
+                        
+                        # Scroll the element into view (especially important for Firefox)
+                        driver.execute_script("arguments[0].scrollIntoView(true);", input_box)
+                        time.sleep(1)  # Give time for scroll to complete
+                        
+                        # Clear the input box and enter the Spotify link
+                        input_box.clear()
+                        time.sleep(0.5)  # Give time for clear to complete
+                        input_box.send_keys(spotify_link)
+                        time.sleep(0.5)  # Give time for keys to be entered
+                        input_box.send_keys(Keys.RETURN)
+                        
+                        # Wait for the download button to be present and click it
+                        download_button = WebDriverWait(driver, 20).until(
+                            EC.element_to_be_clickable((By.CSS_SELECTOR, "button#downloadAllBtn"))
+                        )
+                        
+                        # Scroll the button into view
+                        driver.execute_script("arguments[0].scrollIntoView(true);", download_button)
+                        time.sleep(1)  # Give time for scroll to complete
+                        
+                        download_button.click()
+                        
+                        # Wait for the download to complete
+                        time.sleep(10)
+                        
+                    except Exception as e:
+                        error_msg = f'Failed to initialize {browser_type.capitalize()}Driver: {str(e)}'
+                        print(error_msg)  # Print to console for debugging
+                        self.restore_state(initial_state)
+                        messagebox.showerror('Error', error_msg)
+                        return
+                    finally:
+                        try:
+                            driver.quit()
+                        except:
+                            pass  # Ignore any errors during driver cleanup
+                    
+                    # Find and move zip file from downloads to output directory
+                    if platform.system() == "Windows":
+                        downloads_dir = os.path.join(os.path.expanduser("~"), "Downloads")
+                    else:
+                        downloads_dir = os.path.expanduser("~/Downloads")
+                        
+                    for file in os.listdir(downloads_dir):
+                        if file.endswith('.zip'):
+                            zip_path = os.path.join(downloads_dir, file)
+                            new_zip_path = os.path.join(output_dir, file)
+                            shutil.move(zip_path, new_zip_path)
+                            
+                            # Extract zip file
+                            with zipfile.ZipFile(new_zip_path, 'r') as zip_ref:
+                                zip_ref.extractall(output_dir)
+                            os.remove(new_zip_path)
+                    
+                    # Move extracted jpg files to output directory        
+                    for file in os.listdir(output_dir):
+                        if file.endswith('.jpg'):
+                            # Files are already in output_dir, no need to move
+                            pass
+                except Exception as e:
+                    self.restore_state(initial_state)
+                    messagebox.showerror('Error', f'Failed to download Spotify album art: {str(e)}')
+                    return
+
+            cfg = self.config
+            if platform.system() == "Darwin":  # macOS
+                ffmpeg_path = resource_path("ffmpeg")
+                ffmpeg_exe = os.path.join(ffmpeg_path, "ffmpeg")
+                yt_dlp_path = resource_path("yt-dlp")
+                yt_dlp_exe = os.path.join(yt_dlp_path, "yt-dlp")
+            else:
+                ffmpeg_path = resource_path("ffmpeg")
+                ffmpeg_exe = os.path.join(ffmpeg_path, "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg")
+                print(ffmpeg_exe)
+                yt_dlp_path = resource_path("yt-dlp")
+                yt_dlp_exe = os.path.join(yt_dlp_path, "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp")
+                print(yt_dlp_exe)
+
+            if not os.path.isfile(ffmpeg_exe):
+                messagebox.showerror("Missing FFmpeg","ffmpeg not found. Please install FFmpeg and ensure it's in your PATH.")
                 return
 
-        cfg = self.config
-        if platform.system() == "Darwin":  # macOS
-            ffmpeg_path = resource_path("ffmpeg")
-            ffmpeg_exe = os.path.join(ffmpeg_path, "ffmpeg")
-            yt_dlp_path = resource_path("yt-dlp")
-            yt_dlp_exe = os.path.join(yt_dlp_path, "yt-dlp")
-        else:
-            ffmpeg_path = resource_path("ffmpeg")
-            ffmpeg_exe = os.path.join(ffmpeg_path, "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg")
-            print(ffmpeg_exe)
-            yt_dlp_path = resource_path("yt-dlp")
-            yt_dlp_exe = os.path.join(yt_dlp_path, "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp")
-            print(yt_dlp_exe)
+            if not os.path.isfile(yt_dlp_exe):
+                messagebox.showerror("Missing yt-dlp","yt-dlp not found. Please install yt-dlp and ensure it's in your PATH.")
+                return
 
-        if not os.path.isfile(ffmpeg_exe):
-            messagebox.showerror("Missing FFmpeg","ffmpeg not found. Please install FFmpeg and ensure it's in your PATH.")
-            return
+            rows = list(csv.DictReader(open(self.csv_path, newline='', encoding='utf-8')))
+            total = len(rows)
+            self.progress['maximum'] = total
 
-        if not os.path.isfile(yt_dlp_exe):
-            messagebox.showerror("Missing yt-dlp","yt-dlp not found. Please install yt-dlp and ensure it's in your PATH.")
-            return
+            for i, row in enumerate(rows, 1):
+                title = row.get('Track Name') or row.get('Track name') or 'Unknown'
+                artist = row.get('Artist Name(s)') or row.get('Artist name') or 'Unknown'
+                album = row.get('Album Name') or row.get('Album') or playlist_name
+                safe_title = re.sub(r"[^\w\s]", '', title)
+                safe_artist = re.sub(r"[^\w\s]", '', artist)
 
-        log_path = os.path.join(output_dir, 'error.log')
-        rows = list(csv.DictReader(open(self.csv_path, newline='', encoding='utf-8')))
-        total = len(rows)
-        self.progress['maximum'] = total
+                new_files = []
+                for variant in cfg['variants']:
+                    q = f"{safe_title} {safe_artist} {variant}".strip()
+                    self.status_label.config(text=f"[{i}/{total}] Searching: {q}")
+                    cmd = [yt_dlp_exe, f'--ffmpeg-location={ffmpeg_path}', '-f', 'bestaudio[ext=m4a]/bestaudio']
+                    # Thumbnail embedding
+                    if self.thumb_var.get():
+                        cmd += ['--embed-thumbnail', '--add-metadata']
+                    if self.mp3_var.get():
+                        cmd += ['--extract-audio', '--audio-format', 'mp3']
+                        if self.quality_var.get():
+                            cmd += ['--audio-quality', '0']
+                    else:
+                        cmd += ['--remux-video', 'm4a']
+                    cmd += ['--output', os.path.join(output_dir, '%(title)s.%(ext)s'), '--no-playlist', f'ytsearch1:{q}']
+                    if self.exclude_instr_var.get():
+                        cmd += ['--reject-title', '(?i)instrumental']
+                    creationflags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
+                    result = subprocess.run(cmd, capture_output=True, text=True, creationflags=creationflags)
 
-        for i, row in enumerate(rows, 1):
-            title = row.get('Track Name') or row.get('Track name') or 'Unknown'
-            artist = row.get('Artist Name(s)') or row.get('Artist name') or 'Unknown'
-            album = row.get('Album Name') or row.get('Album') or playlist_name
-            safe_title = re.sub(r"[^\w\s]", '', title)
-            safe_artist = re.sub(r"[^\w\s]", '', artist)
-            new_files = []
-            for variant in (cfg.get('variants') or ['']):
-                q = f"{safe_title} {safe_artist} {variant}".strip()
-                self.status_label.config(text=f"[{i}/{total}] Searching: {q}")
-                cmd = [yt_dlp_exe, f'--ffmpeg-location={ffmpeg_path}', '-f', 'bestaudio[ext=m4a]/bestaudio']
-                # Thumbnail embedding
-                if self.thumb_var.get():
-                    cmd += ['--embed-thumbnail', '--add-metadata']
-                if self.mp3_var.get():
-                    cmd += ['--extract-audio', '--audio-format', 'mp3']
-                    if self.quality_var.get():
-                        cmd += ['--audio-quality', '0']
-                else:
-                    cmd += ['--remux-video', 'm4a']
-                cmd += ['--output', os.path.join(output_dir, '%(title)s.%(ext)s'), '--no-playlist', f'ytsearch1:{q}']
-                if self.exclude_instr_var.get():
-                   cmd += ['--reject-title', '(?i)instrumental']
-                creationflags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
+                    # Check if the search returned 0 items
+                    if "Downloading 0 items" in result.stdout:
+                        print(f"Could not find song: {title} by {artist}")
+                        # Only add to not_found_songs if this is the last variant
+                        if variant == cfg['variants'][-1]:
+                                not_found_songs.append({
+                                    'Track Name': title,
+                                    'Artist Name(s)': artist,
+                                    'Album Name': album,
+                                    'Track Number': i,
+                                    'Error': 'No search results found',
+                                })
+                        continue
+                            
+                    if result.returncode != 0:
+                        print(f"Error output: {result.stderr}")
+                        # Check if the error is due to not finding the song
+                        if "No video results" in result.stderr or "No matches found" in result.stderr:
+                            print(f"Could not find song: {title} by {artist}")
+                            # Only add to not_found_songs if this is the last variant
+                            if variant == cfg['variants'][-1]:
+                                not_found_songs.append({
+                                    'Track Name': title,
+                                    'Artist Name(s)': artist,
+                                    'Album Name': album,
+                                    'Track Number': i,
+                                    'Error': 'Song not found',
+                                })
+                            continue
+                        else:
+                                # Only add to not_found_songs if this is the last variant
+                                if variant == cfg['variants'][-1]:
+                                    not_found_songs.append({
+                                        'Track Name': title,
+                                        'Artist Name(s)': artist,
+                                        'Album Name': album,
+                                        'Track Number': i,
+                                        'Error': result.stderr.strip(),
+                                    })
+                                continue
+                    new_files = [fn for fn in os.listdir(output_dir)
+                                    if fn.lower().endswith(('.mp3', '.m4a')) and fn not in downloaded]
+                    if new_files:
+                        break
+                    else:
+                        print("No new files found after download attempt")
+                        # Only add to not_found_songs if this is the last variant
+                        if variant == cfg['variants'][-1]:
+                                not_found_songs.append({
+                                    'Track Name': title,
+                                    'Artist Name(s)': artist,
+                                    'Album Name': album,
+                                    'Track Number': i,
+                                })
 
-                result = subprocess.run(cmd, capture_output=True, text=True, creationflags=creationflags)
-                if result.returncode != 0:
-                    with open(log_path, 'a') as log:
-                        log.write(result.stderr)
-                new_files = [fn for fn in os.listdir(output_dir)
-                             if fn.lower().endswith(('.mp3', '.m4a')) and fn not in downloaded]
-                if new_files:
-                    break
+                    if not new_files:
+                        continue
 
-            if not new_files:
-                continue
+                    elapsed = time.time() - start_time
+                    eta = timedelta(seconds=int((elapsed / i) * (total - i)))
+                    self.progress['value'] = i
+                    self.status_label.config(text=f"Downloaded {i}/{total}, ETA: {eta}")
+                    self.root.update_idletasks()
 
-            elapsed = time.time() - start_time
-            eta = timedelta(seconds=int((elapsed / i) * (total - i)))
-            self.progress['value'] = i
-            self.status_label.config(text=f"Downloaded {i}/{total}, ETA: {eta}")
+                    for fn in new_files:
+                        fpath = os.path.join(output_dir, fn)
+                        if fn.lower().endswith('.m4a') and not self.mp3_var.get():
+                            audio = MP4(fpath)
+                            tags = audio.tags or MP4Tags()
+                            tags['\xa9nam'] = [title]
+                            tags['\xa9ART'] = [artist]
+                            tags['\xa9alb'] = [album]
+                            audio.save()
+                        else:
+                            try:
+                                audio = EasyID3(fpath)
+                            except:
+                                audio = EasyID3()
+                                audio.load()
+                            audio.update({'artist': artist, 'title': title, 'album': album, 'tracknumber': str(i)})
+                            audio.save()
+                        downloaded.append(fn)
+
+            if self.m3u_var.get():
+                m3u_filename = playlist_name.replace('_', ' ')
+                m3u_path = os.path.join(output_dir, f"{m3u_filename}.m3u")
+                with open(m3u_path, 'w', encoding='utf-8') as m3u:
+                    # Write M3U header
+                    m3u.write('#EXTM3U\n')
+                    
+                    # Get all audio files in the output directory
+                    audio_files = [f for f in os.listdir(output_dir) if f.lower().endswith(('.mp3', '.m4a'))]
+                    # Sort them by creation time to match the download order
+                    audio_files.sort(key=lambda x: os.path.getctime(os.path.join(output_dir, x)))
+                    
+                    for fn in audio_files:
+                        # Write track info
+                        m3u.write(f'#EXTINF:-1,{os.path.splitext(fn)[0]}\n')
+                        # Use relative path
+                        m3u.write(f'{fn}\n')
+
+            # Save not found songs to CSV with more detailed information
+            not_found_csv_path = os.path.join(output_dir, f"{playlist_name}_not_found.csv")
+            print(f"\nCreating CSV file at: {not_found_csv_path}")
+            print(f"Number of failed downloads to write: {len(not_found_songs)}")
+            
+            # Only create CSV file if there are failed downloads
+            if not_found_songs:
+                try:
+                    with open(not_found_csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+                        fieldnames = ['Track Name', 'Artist Name(s)', 'Album Name', 'Track Number', 'Error']
+                        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(not_found_songs)
+                        print(f"Successfully wrote {len(not_found_songs)} failed downloads to CSV")
+                        print(f"CSV file location: {os.path.abspath(not_found_csv_path)}")
+                except Exception as e:
+                    print(f"Error creating CSV file: {str(e)}")
+            else:
+                print("No failed downloads - skipping CSV creation")
+
+            # Handle album art if Spotify album art was enabled
+            if self.spotify_art_var.get():
+                self.status_label.config(text='Renaming album art files...')
+                self.rename_album_art(output_dir, not_found_songs)
+                
+                self.status_label.config(text='Embedding album art...')
+                self.embed_all_artwork(output_dir, not_found_songs)
+
+            self.progress['value'] = self.progress['maximum']
+            self.root.config(cursor='')
+            self.convert_button.config(state=tk.NORMAL)
+            self.clear_button.config(state=tk.NORMAL)
+            self.status_label.config(text=f"✅ Completed in {timedelta(seconds=int(time.time() - start_time))}")
+            self.root.bell()
+
+        except Exception as e:
+            # Restore initial state
+            self.restore_state(initial_state)
+            messagebox.showerror('Error', f'An unexpected error occurred: {str(e)}')
+        finally:
+            # Ensure buttons are always enabled and UI is updated
+            self.convert_button.config(state=tk.NORMAL)
+            self.clear_button.config(state=tk.NORMAL)
             self.root.update_idletasks()
 
-            for fn in new_files:
-                fpath = os.path.join(output_dir, fn)
-                if fn.lower().endswith('.m4a') and not self.mp3_var.get():
-                    audio = MP4(fpath)
-                    tags = audio.tags or MP4Tags()
-                    tags['\xa9nam'] = [title]
-                    tags['\xa9ART'] = [artist]
-                    tags['\xa9alb'] = [album]
-                    audio.save()
-                else:
-                    try:
-                        audio = EasyID3(fpath)
-                    except:
-                        audio = EasyID3()
-                        audio.load()
-                    audio.update({'artist': artist, 'title': title, 'album': album, 'tracknumber': str(i)})
-                    audio.save()
-                downloaded.append(fn)
-
-        if self.m3u_var.get():
-            m3u_filename = playlist_name.replace('_', ' ')
-            m3u_path = os.path.join(output_dir, f"{m3u_filename}.m3u")
-            with open(m3u_path, 'w', encoding='utf-8') as m3u:
-                for fn in downloaded:
-                    raw = os.path.join(output_dir, fn)
-                    if platform.system() == "Windows":
-                        m3u.write(str(PureWindowsPath(raw)) + '\r\n')
-                    else:
-                        m3u.write(raw + '\n')
-
-        # Handle album art if Spotify album art was enabled
-        if self.spotify_art_var.get():
-            self.status_label.config(text='Renaming album art files...')
-            self.rename_album_art(output_dir)
-            
-            self.status_label.config(text='Embedding album art...')
-            self.embed_all_artwork(output_dir)
-
-        self.progress['value'] = self.progress['maximum']
-        self.root.config(cursor='')
-        self.convert_button.config(state=tk.NORMAL)
-        self.clear_button.config(state=tk.NORMAL)
-        self.status_label.config(text=f"✅ Completed in {timedelta(seconds=int(time.time() - start_time))}")
-        self.root.bell()
-
+    def restore_state(self, state):
+        """Restore the UI to its initial state"""
+        try:
+            self.root.config(cursor=state['cursor'])
+            self.convert_button.config(state=tk.NORMAL)  # Always enable convert button
+            self.clear_button.config(state=tk.NORMAL)    # Always enable clear button
+            self.progress['value'] = state['progress_value']
+            self.status_label.config(text=state['status_text'])
+            self.root.update_idletasks()  # Force UI update
+        except Exception as e:
+            print(f"Error restoring state: {e}")
 
     def update_artwork_options(self):
         # If thumbnail embedding is selected, disable Spotify art
