@@ -1,7 +1,5 @@
 {
-    "variants": [
-        "Offical Audio"
-    ],
+    "variants": [],
     "duration_min": 60,
     "duration_max": 600,
     "transcode_mp3": false,
