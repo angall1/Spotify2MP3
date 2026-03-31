@@ -10,7 +10,7 @@ CHECK OUT THE NEW VERSION : [CSVMUSIC](https://github.com/angall1/CSVMusic)
 
 - It features an improved song matching algorithm, a better UI, and more
 
-Grab the latest build from the [Releases page](https://github.com/angall1/Spotify2MP3/releases):
+Grab the latest build of Spotify2MP3 from the [Releases page](https://github.com/angall1/Spotify2MP3/releases):
 
 - **Windows**: Download the ZIP, extract, and run `Spotify2MP3.exe`  
 - **macOS**: Download the ZIP, unzip, and open `Spotify2MP3.app`  
