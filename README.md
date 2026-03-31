@@ -7,7 +7,8 @@ Spotify2MP3 is a cross-platform standalone app (Windows EXE, macOS .app) that ta
 ##  Download
 
 CHECK OUT THE NEW VERSION : [CSVMUSIC](https://github.com/angall1/CSVMusic)
-It features an improved song matching algorithm, a better UI, and more
+
+- It features an improved song matching algorithm, a better UI, and more
 
 Grab the latest build from the [Releases page](https://github.com/angall1/Spotify2MP3/releases):
 
